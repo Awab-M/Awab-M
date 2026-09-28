@@ -55,8 +55,11 @@ The token is stored only in `data/settings.json` and sent only to Hugging Face. 
 - **Max 6 chunks per render** (about 12 s). Chunks past that are shown struck through and won't render.
 - **Memory lasts one render.** WorldCrafter remembers the scene within a render. A continued leg only
   sees the last frame, so it won't remember what was behind you.
-- **GPU quota.** Each render reserves 41–117 s of GPU time from your quota (shown before you render;
-  the formula is the Space's own).
+- **GPU quota.** Hugging Face gives 2 min/day without a token, 5 min/day with a free account and
+  40 min/day with PRO ([docs](https://huggingface.co/docs/hub/spaces-zerogpu)); it resets 24 h after
+  your first use. This Space runs on an *xlarge* GPU that counts double, so a render costs roughly
+  82 s (1 chunk) to 212 s (6 chunks) of quota. The app shows the cost and how many fit per day before
+  you render. Without a token, only 1–2 chunk renders fit.
 - **Shared Space.** Other people use it too, so you may queue. If the owner pauses or changes it,
   renders stop working. `--space` can point at a duplicate.
 

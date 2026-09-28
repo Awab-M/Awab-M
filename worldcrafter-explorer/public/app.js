@@ -1,5 +1,6 @@
 import {
-  analyzeScript, countChunks, CHUNK_FRAMES, estimateGpuSeconds, formatActions, FPS, poseSummary, SPACE_MAX_CHUNKS,
+  analyzeScript, countChunks, CHUNK_FRAMES, DAILY_QUOTA_SECONDS, estimateQuotaSeconds, formatActions, FPS, poseSummary,
+  rendersPerDay, SPACE_MAX_CHUNKS,
 } from "./actions.js";
 
 const $ = (id) => document.getElementById(id);
@@ -347,10 +348,24 @@ function refreshRoute() {
   $("meter").innerHTML = `
     <div class="${over ? "warn" : ""}"><b>${rendered}/${SPACE_MAX_CHUNKS}</b><span>chunks${over ? ` · ${available - rendered} beyond the limit won't render` : ""}</span></div>
     <div><b>${seconds.toFixed(1)} s</b><span>of video at ${FPS} fps</span></div>
-    <div><b>${rendered ? `≈${estimateGpuSeconds(state.mode, rendered)} s` : "–"}</b><span>GPU time reserved from your quota</span></div>`;
+    ${quotaTile(rendered)}`;
 
   drawMinimap(analysis);
   refreshRenderButton();
+}
+
+const TIER_NAMES = { anonymous: "No token", free: "Free account", pro: "PRO account" };
+
+/** Quota cost of this render and how many of its size fit in the daily allowance. */
+function quotaTile(chunks) {
+  if (!chunks) return `<div><b>–</b><span>of your daily GPU quota</span></div>`;
+  const tier = state.status?.token?.tier ?? "anonymous";
+  const perDay = rendersPerDay(tier, state.mode, chunks);
+  const minutes = DAILY_QUOTA_SECONDS[tier] / 60;
+  const note = perDay > 0
+    ? `${TIER_NAMES[tier]} (${minutes} min/day): about ${perDay} like this per day`
+    : `Too big for the ${minutes}-min anonymous allowance. Add a free token or use fewer chunks`;
+  return `<div class="${perDay > 0 ? "" : "warn"}" title="The Space uses an xlarge GPU, which Hugging Face bills at 2x. Estimate uses the Space's reserved time, so real use is often lower."><b>≈${estimateQuotaSeconds(state.mode, chunks)} s</b><span>${note}</span></div>`;
 }
 
 function refreshRenderButton() {
@@ -636,8 +651,8 @@ function renderJob() {
   } else if (job.phase === "error") {
     detail = job.error?.message || "";
     if (job.error?.quota) detail += state.status?.token?.present
-      ? "\n\nYour account's free GPU time for today is used up. It refills over time (a PRO account gets much more)."
-      : "\n\nAdd a free Hugging Face token to get your own GPU allowance.";
+      ? "\n\nYour daily GPU allowance is used up. It resets 24 hours after your first render of the day (PRO accounts get 8x more)."
+      : "\n\nThe anonymous allowance is 2 minutes a day. A free Hugging Face token gives you 5 minutes of your own.";
   } else if (job.phase === "done") {
     detail = (job.run?.info || "").replaceAll("**", "");
   }
@@ -866,6 +881,7 @@ async function loadStatus() {
   spacePill.textContent = text;
 
   const token = state.status.token;
+  refreshRoute();
   const tokenPill = $("token-pill");
   if (token.present && token.user) {
     tokenPill.className = "pill pill-button good";

@@ -388,6 +388,23 @@ export function estimateGpuSeconds(mode, chunks) {
   return Math.round(1.15 * (22.0 + first + (n - 1) * 11.4));
 }
 
+/**
+ * Daily ZeroGPU quota in seconds per account tier, and the multiplier for the
+ * Space's `size="xlarge"` GPU. Source: https://huggingface.co/docs/hub/spaces-zerogpu
+ */
+export const DAILY_QUOTA_SECONDS = { anonymous: 120, free: 300, pro: 2400 };
+export const XLARGE_QUOTA_MULTIPLIER = 2;
+
+/** Quota a render can cost, using the Space's reserved duration (an upper bound). */
+export function estimateQuotaSeconds(mode, chunks) {
+  return XLARGE_QUOTA_MULTIPLIER * estimateGpuSeconds(mode, chunks);
+}
+
+/** How many renders of this size fit in a tier's full daily quota. */
+export function rendersPerDay(tier, mode, chunks) {
+  return Math.floor((DAILY_QUOTA_SECONDS[tier] ?? DAILY_QUOTA_SECONDS.anonymous) / estimateQuotaSeconds(mode, chunks));
+}
+
 /** Top-down (x, z) position and heading (radians, 0 = +z) of a pose. */
 export function poseSummary(m) {
   const fx = m[0][2], fy = m[1][2], fz = m[2][2];

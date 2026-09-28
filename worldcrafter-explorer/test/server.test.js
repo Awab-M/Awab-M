@@ -88,6 +88,7 @@ test("status reports the Space stage and no token by default", async () => {
   const body = await (await fetch(base + "/api/status")).json();
   assert.equal(body.space.stage, "RUNNING");
   assert.equal(body.token.present, false);
+  assert.equal(body.token.tier, "anonymous");
   assert.equal(body.maxChunks, 6);
 });
 
@@ -102,6 +103,7 @@ test("token settings verify, mask and never echo the token", async () => {
   assert.ok(!JSON.stringify(body).includes("bbbbbbbb"));
   const status = await (await fetch(base + "/api/status")).json();
   assert.equal(status.token.source, "saved in this app");
+  assert.equal(status.token.tier, "free", "a non-PRO account is the free tier");
   await post("/api/settings/token", { token: "" });
 });
 

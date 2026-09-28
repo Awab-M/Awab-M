@@ -57,7 +57,7 @@ export async function whoami(token, fetchImpl = fetch) {
     if (response.status === 401) return { ok: false, error: "Hugging Face rejected this token." };
     if (!response.ok) return { ok: false, error: `Hugging Face returned HTTP ${response.status}.`, unverified: true };
     const body = await response.json();
-    return { ok: true, user: body.name };
+    return { ok: true, user: body.name, pro: body.isPro === true };
   } catch (error) {
     return { ok: false, error: `Could not reach Hugging Face: ${error.message}`, unverified: true };
   }

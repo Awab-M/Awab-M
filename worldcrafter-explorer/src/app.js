@@ -142,11 +142,13 @@ export function createApp({ dataDir, space, spaceId, whoami = realWhoami, fetchI
     const { token, source } = await tokens.resolve();
     if (token && tokenUser.token !== token) {
       const check = await whoami(token);
-      tokenUser = { token, user: check.ok ? check.user : null, error: check.ok ? null : check.error };
+      tokenUser = { token, user: check.ok ? check.user : null, pro: Boolean(check.pro), error: check.ok ? null : check.error };
     }
     return {
       present: Boolean(token), source, masked: maskToken(token),
       user: token ? tokenUser.user : null, error: token ? tokenUser.error : null,
+      // Quota tier for the page's estimates; an unverified token is treated as a free account.
+      tier: !token ? "anonymous" : tokenUser.pro ? "pro" : "free",
     };
   }
 
@@ -219,7 +221,7 @@ export function createApp({ dataDir, space, spaceId, whoami = realWhoami, fetchI
       if (token) {
         const check = await whoami(token);
         if (!check.ok && !check.unverified) throw new HttpError(400, check.error);
-        tokenUser = { token, user: check.ok ? check.user : null, error: check.ok ? null : check.error };
+        tokenUser = { token, user: check.ok ? check.user : null, pro: Boolean(check.pro), error: check.ok ? null : check.error };
       }
       await tokens.save(token || null);
       return sendJson(res, 200, { token: await tokenStatus() });

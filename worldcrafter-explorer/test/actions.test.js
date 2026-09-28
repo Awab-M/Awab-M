@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
-  analyzeScript, buildTrajectory, countChunks, estimateGpuSeconds, formatActions,
+  analyzeScript, buildTrajectory, countChunks, estimateGpuSeconds, estimateQuotaSeconds, formatActions, rendersPerDay,
   parseTrajectory, poseSummary, SPACE_MAX_CHUNKS,
 } from "../public/actions.js";
 
@@ -65,6 +65,19 @@ test("estimateGpuSeconds uses the Space's own duration formula", () => {
   assert.equal(estimateGpuSeconds("i2v", 6), 106);
   assert.equal(estimateGpuSeconds("t2v", 1), 52);
   assert.equal(estimateGpuSeconds("i2v", 99), 106);
+});
+
+test("quota estimates count the xlarge GPU double and fit the daily tiers", () => {
+  assert.equal(estimateQuotaSeconds("i2v", 1), 82);
+  assert.equal(estimateQuotaSeconds("i2v", 6), 212);
+  // Anonymous (120 s/day): one short render; 3+ chunks don't fit at all.
+  assert.equal(rendersPerDay("anonymous", "i2v", 1), 1);
+  assert.equal(rendersPerDay("anonymous", "i2v", 2), 1);
+  assert.equal(rendersPerDay("anonymous", "i2v", 3), 0);
+  // Free (300 s/day) and PRO (2400 s/day).
+  assert.equal(rendersPerDay("free", "i2v", 1), 3);
+  assert.equal(rendersPerDay("free", "i2v", 6), 1);
+  assert.equal(rendersPerDay("pro", "i2v", 6), 11);
 });
 
 test("poseSummary reports heading and pitch in the model's axes", () => {
