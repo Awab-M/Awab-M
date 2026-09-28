@@ -1033,7 +1033,11 @@ function wire() {
     key.addEventListener("click", (event) => addMove(key.dataset.move, event.shiftKey));
   });
   $("undo-btn").addEventListener("click", undo);
-  $("clear-btn").addEventListener("click", () => setEvents([]));
+  $("clear-btn").addEventListener("click", () => {
+    // Also drop script headers (e.g. an example's @sampling), so Clear means an empty script.
+    state.options = {};
+    setEvents([]);
+  });
   $("reverse-btn").addEventListener("click", returnToStart);
   $("script").addEventListener("input", onScriptInput);
 
