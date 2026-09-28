@@ -39,6 +39,17 @@ export function findFileUrl(value) {
 }
 
 /**
+ * Map a Gradio status event to our phase. The client reports stage "pending" for
+ * queue estimates, process start and step progress alike, so look at the payload.
+ */
+export function phaseFor(event, started) {
+  if (event.stage === "generating" || event.stage === "streaming") return "generating";
+  if (started || event.original_msg === "process_starts") return "generating";
+  if (event.progress_data?.some((p) => p && p.length)) return "generating";
+  return "queued";
+}
+
+/**
  * Real backend. `submit` resolves with { video: Buffer, info } or rejects with SpaceError.
  * `onUpdate` receives { phase, position, queueSize, eta, progress, message }.
  */
@@ -89,6 +100,7 @@ export class SpaceBackend {
     const job = client.submit(endpoint, payload);
     const abort = () => job.cancel?.().catch(() => {});
     signal?.addEventListener("abort", abort, { once: true });
+    let started = false;
     try {
       for await (const event of job) {
         if (signal?.aborted) throw new SpaceError("Cancelled", "The render was cancelled.");
@@ -98,14 +110,13 @@ export class SpaceBackend {
             const quota = /quota|runs limit/i.test(`${event.title} ${message}`);
             throw new SpaceError(event.title || "The Space reported an error", message, { quota });
           }
+          if (event.stage === "complete") continue;
+          const phase = phaseFor(event, started);
+          started = phase === "generating";
           const progress = event.progress_data?.find((p) => p && p.length);
-          onUpdate({
-            phase: event.stage === "pending" ? "queued" : "generating",
-            position: event.position ?? null,
-            queueSize: event.size ?? null,
-            eta: event.eta ?? null,
-            progress: progress ? { index: progress.index, length: progress.length, desc: progress.desc } : null,
-          });
+          onUpdate(phase === "queued"
+            ? { phase, position: event.position ?? null, queueSize: event.size ?? null, eta: event.eta ?? null, progress: null }
+            : { phase, position: null, queueSize: null, eta: null, progress: progress ? { index: progress.index ?? 0, length: progress.length, desc: progress.desc ?? null } : null });
         } else if (event.type === "data") {
           const url = findFileUrl(event.data?.[0]);
           const info = typeof event.data?.[1] === "string" ? event.data[1] : "";

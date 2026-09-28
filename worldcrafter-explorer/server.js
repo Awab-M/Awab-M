@@ -42,7 +42,8 @@ server.on("error", (error) => {
 server.listen(Number(args.port), "127.0.0.1", () => {
   const url = `http://localhost:${args.port}`;
   console.log(`WorldCrafter Explorer running at ${url}`);
-  console.log(`Space: ${args.space} · data: ${args.data}`);
+  console.log(`Space: ${args.space}`);
+  console.log(`Data:  ${args.data}`);
   console.log("Press Ctrl+C to stop.");
   if (args.open) openBrowser(url);
 });

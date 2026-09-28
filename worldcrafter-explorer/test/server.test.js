@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createApp, CLIENT_HEADER } from "../src/app.js";
-import { SpaceError, findFileUrl } from "../src/space.js";
+import { SpaceError, findFileUrl, phaseFor } from "../src/space.js";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -192,6 +192,16 @@ test("findFileUrl handles the payload shapes Gradio uses for videos", () => {
   assert.equal(findFileUrl({ url: "https://x/b.mp4", path: "/tmp/b.mp4" }), "https://x/b.mp4");
   assert.equal(findFileUrl("https://x/c.mp4"), "https://x/c.mp4");
   assert.equal(findFileUrl({ path: "/tmp/only-path" }), null);
+});
+
+test("phaseFor tells queueing from generating although Gradio says pending for both", () => {
+  // Shapes observed from the live Space: estimation, process start, ZeroGPU init, denoising steps.
+  assert.equal(phaseFor({ stage: "pending", position: 0, size: 1, eta: 46 }, false), "queued");
+  assert.equal(phaseFor({ stage: "pending", original_msg: "process_starts", position: 0 }, false), "generating");
+  assert.equal(phaseFor({ stage: "pending", progress_data: [{ index: 35, length: 100, desc: "ZeroGPU init" }] }, false), "generating");
+  assert.equal(phaseFor({ stage: "pending", progress_data: [{ index: 4, length: 6, desc: null }] }, false), "generating");
+  assert.equal(phaseFor({ stage: "pending", position: 0 }, true), "generating", "stays generating once started");
+  assert.equal(phaseFor({ stage: "generating" }, false), "generating");
 });
 
 test("examples come from the Space repo and are cached on disk", async () => {

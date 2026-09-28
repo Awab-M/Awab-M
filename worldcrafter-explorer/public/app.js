@@ -625,7 +625,12 @@ function renderJob() {
     const pos = job.position != null ? `Position ${job.position + 1}${job.queueSize ? ` of ${job.queueSize}` : ""}` : "In line";
     detail = `${pos}${job.eta ? ` · about ${Math.round(job.eta)} s` : ""}. Other people use this free Space too.`;
   } else if (job.phase === "generating") {
-    detail = `${job.numChunks} chunk(s) on a shared H200.${determinate ? ` ${job.progress.desc || "Step"} ${job.progress.index}/${job.progress.length}` : " Usually 40–120 s."}`;
+    const gpuSeconds = Math.round(22 + (job.mode === "t2v" ? 23 : 13.5) + (job.numChunks - 1) * 11.4);
+    const p = job.progress;
+    const step = !determinate ? "Starting on the GPU…"
+      : /zerogpu/i.test(p.desc || "") ? `Attaching a GPU… ${Math.round((100 * p.index) / p.length)}%`
+      : `${p.desc || "Denoising step"} ${p.index}/${p.length}`;
+    detail = `${step}\n${job.numChunks} chunk(s), about ${gpuSeconds} s of GPU work in total.`;
   } else if (job.phase === "waking") {
     detail = `${job.message || "The Space was asleep."} Loading 137 GB of weights can take several minutes.`;
   } else if (job.phase === "error") {
