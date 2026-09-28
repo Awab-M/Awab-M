@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createApp, CLIENT_HEADER } from "../src/app.js";
-import { SpaceError, findFileUrl, phaseFor } from "../src/space.js";
+import { ProgressTracker, SpaceError, findFileUrl, phaseFor } from "../src/space.js";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -18,6 +18,7 @@ class FakeSpace {
     if (this.mode === "hold") {
       await new Promise((resolve, reject) => {
         this.release = resolve;
+        if (signal.aborted) reject(new SpaceError("Cancelled", "cancelled"));
         signal.addEventListener("abort", () => reject(new SpaceError("Cancelled", "cancelled")));
       });
     }
@@ -72,6 +73,8 @@ test("serves the UI and the shared action module", async () => {
   assert.match(js.headers.get("content-type"), /javascript/);
   assert.equal((await fetch(base + "/../package.json")).status, 404);
   assert.equal((await fetch(base + "/%2e%2e/package.json")).status, 404);
+  assert.equal((await fetch(base + "/%5c..%5c..%5cpackage.json")).status, 404, "backslash traversal (Windows)");
+  assert.equal((await fetch(base + "/%E0%A4%A")).status, 400, "malformed escape is a clean 400");
 });
 
 test("rejects non-local Host headers and cross-site writes", async () => {
@@ -189,6 +192,17 @@ test("one render at a time, cancellable, with a live event stream", async () => 
   space.mode = "ok";
 });
 
+test("a render cancelled before it reaches the Space never calls it", async () => {
+  space.mode = "ok";
+  const calls = space.calls.length;
+  const { job } = await (await post("/api/jobs", { mode: "t2v", prompt: "a city", actions: "forward1" })).json();
+  // Cancel immediately, while the job is still resolving the token.
+  await post(`/api/jobs/${job.id}/cancel`, {});
+  const done = await waitForJob(job.id);
+  if (done.phase === "cancelled") assert.equal(space.calls.length, calls, "Space was not called");
+  else assert.equal(done.phase, "done", "a fast job may finish before the cancel lands, but never hangs");
+});
+
 test("findFileUrl handles the payload shapes Gradio uses for videos", () => {
   assert.equal(findFileUrl({ video: { url: "https://x/a.mp4" }, subtitles: null }), "https://x/a.mp4");
   assert.equal(findFileUrl({ url: "https://x/b.mp4", path: "/tmp/b.mp4" }), "https://x/b.mp4");
@@ -204,6 +218,18 @@ test("phaseFor tells queueing from generating although Gradio says pending for b
   assert.equal(phaseFor({ stage: "pending", progress_data: [{ index: 4, length: 6, desc: null }] }, false), "generating");
   assert.equal(phaseFor({ stage: "pending", position: 0 }, true), "generating", "stays generating once started");
   assert.equal(phaseFor({ stage: "generating" }, false), "generating");
+});
+
+test("ProgressTracker counts chunks from restarting step bars and bridges the gaps", () => {
+  // Sequence recorded from a live 2-chunk render: GPU attach, 0..6, gap, 0..6, gap.
+  const t = new ProgressTracker();
+  assert.equal(t.update([{ index: 35, length: 100, desc: "ZeroGPU init" }]).chunk, null);
+  assert.equal(t.update([{ index: 0, length: 6, desc: null }]).chunk, 1);
+  assert.equal(t.update([{ index: 6, length: 6, desc: null }]).chunk, 1);
+  assert.deepEqual(t.update(undefined), { index: 6, length: 6, desc: null, chunk: 1 }, "gap keeps the last step");
+  assert.equal(t.update([{ index: 0, length: 6, desc: null }]).chunk, 2);
+  assert.equal(t.update([{ index: 3, length: 6, desc: null }]).index, 3);
+  assert.equal(t.update([]).chunk, 2);
 });
 
 test("examples come from the Space repo and are cached on disk", async () => {

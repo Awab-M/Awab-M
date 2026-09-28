@@ -50,6 +50,32 @@ export function phaseFor(event, started) {
 }
 
 /**
+ * Turns the Space's per-chunk step bars into { index, length, desc, chunk }. The bar
+ * restarts for every chunk, and between chunks no progress is sent, so keep the last one.
+ */
+export class ProgressTracker {
+  constructor() {
+    this.chunk = 0;
+    this.lastIndex = null;
+    this.last = null;
+  }
+
+  update(progressData) {
+    const p = progressData?.find((x) => x && x.length);
+    if (!p) return this.last;
+    const index = p.index ?? 0;
+    if (/zerogpu/i.test(p.desc || "")) {
+      this.last = { index, length: p.length, desc: p.desc, chunk: null };
+      return this.last;
+    }
+    if (this.lastIndex === null || index < this.lastIndex) this.chunk++;
+    this.lastIndex = index;
+    this.last = { index, length: p.length, desc: p.desc ?? null, chunk: this.chunk };
+    return this.last;
+  }
+}
+
+/**
  * Real backend. `submit` resolves with { video: Buffer, info } or rejects with SpaceError.
  * `onUpdate` receives { phase, position, queueSize, eta, progress, message }.
  */
@@ -97,10 +123,12 @@ export class SpaceBackend {
     if (request.mode === "i2v") payload.image = handle_file(new Blob([request.image], { type: request.imageType || "image/png" }));
     const endpoint = request.mode === "i2v" ? "/generate_i2v" : "/generate_t2v";
 
+    if (signal?.aborted) throw new SpaceError("Cancelled", "The render was cancelled.");
     const job = client.submit(endpoint, payload);
     const abort = () => job.cancel?.().catch(() => {});
     signal?.addEventListener("abort", abort, { once: true });
     let started = false;
+    const tracker = new ProgressTracker();
     try {
       for await (const event of job) {
         if (signal?.aborted) throw new SpaceError("Cancelled", "The render was cancelled.");
@@ -113,10 +141,10 @@ export class SpaceBackend {
           if (event.stage === "complete") continue;
           const phase = phaseFor(event, started);
           started = phase === "generating";
-          const progress = event.progress_data?.find((p) => p && p.length);
+          const progress = tracker.update(event.progress_data);
           onUpdate(phase === "queued"
             ? { phase, position: event.position ?? null, queueSize: event.size ?? null, eta: event.eta ?? null, progress: null }
-            : { phase, position: null, queueSize: null, eta: null, progress: progress ? { index: progress.index ?? 0, length: progress.length, desc: progress.desc ?? null } : null });
+            : { phase, position: null, queueSize: null, eta: null, progress });
         } else if (event.type === "data") {
           const url = findFileUrl(event.data?.[0]);
           const info = typeof event.data?.[1] === "string" ? event.data[1] : "";

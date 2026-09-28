@@ -644,8 +644,8 @@ function renderJob() {
     const p = job.progress;
     const step = !determinate ? "Starting on the GPU…"
       : /zerogpu/i.test(p.desc || "") ? `Attaching a GPU… ${Math.round((100 * p.index) / p.length)}%`
-      : `${p.desc || "Denoising step"} ${p.index}/${p.length}`;
-    detail = `${step}\n${job.numChunks} chunk(s), about ${gpuSeconds} s of GPU work in total.`;
+      : `${p.chunk ? `Chunk ${Math.min(p.chunk, job.numChunks)} of ${job.numChunks} · ` : ""}${p.desc || "denoising step"} ${p.index}/${p.length}`;
+    detail = `${step}\nThe Space reserves up to ${gpuSeconds} s of GPU time for this.`;
   } else if (job.phase === "waking") {
     detail = `${job.message || "The Space was asleep."} Loading 137 GB of weights can take several minutes.`;
   } else if (job.phase === "error") {

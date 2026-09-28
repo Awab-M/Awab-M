@@ -172,6 +172,8 @@ export function createApp({ dataDir, space, spaceId, whoami = realWhoami, fetchI
     const started = Date.now();
     try {
       const { token } = await tokens.resolve();
+      // Cancelled before we got this far: don't send anything to the Space.
+      if (job.controller.signal.aborted) throw new SpaceError("Cancelled", "The render was cancelled.");
       const result = await space.submit(
         { ...request, image: request.image?.bytes, imageType: request.image?.type },
         { token, signal: job.controller.signal, onUpdate: (patch) => update(job, patch) },
@@ -308,7 +310,12 @@ export function createApp({ dataDir, space, spaceId, whoami = realWhoami, fetchI
     }
 
     if (method === "GET" || method === "HEAD") {
-      const rel = pathname === "/" ? "index.html" : decodeURIComponent(pathname.slice(1));
+      let rel;
+      try {
+        rel = pathname === "/" ? "index.html" : decodeURIComponent(pathname.slice(1));
+      } catch {
+        throw new HttpError(400, "Malformed URL.");
+      }
       const file = normalize(join(PUBLIC_DIR, rel));
       if (!file.startsWith(PUBLIC_DIR.endsWith(sep) ? PUBLIC_DIR : PUBLIC_DIR + sep)) throw new HttpError(404, "Not found.");
       return sendFile(req, res, file);
