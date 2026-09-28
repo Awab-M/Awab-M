@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)"><!--shell-->
 <meta name="apple-mobile-web-app-capable" content="yes"><!--shell-->
 <meta name="mobile-web-app-capable" content="yes"><!--shell-->
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><!--shell-->
+<meta name="apple-mobile-web-app-status-bar-style" content="default"><!--shell-->
 <meta name="apple-mobile-web-app-title" content="Mirror"><!--shell-->
 <link rel="manifest" href="manifest.webmanifest"><!--shell-->
 <link rel="icon" href="icon.svg" type="image/svg+xml"><!--shell-->
@@ -27,6 +27,7 @@
     --c-accent: 0 122 255;
     --c-ink: 29 29 31;
     --c-muted: 110 110 115;
+    --c-stage: 251 251 253;
 
     --bg: #f2f2f7;
     --stage: #fbfbfd;
@@ -49,6 +50,7 @@
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+  .app { padding-left: max(16px, env(safe-area-inset-left, 0px)) !important; padding-right: max(16px, env(safe-area-inset-right, 0px)) !important; }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
@@ -57,13 +59,14 @@
       --c-accent: 10 132 255;
       --c-ink: 245 245 247;
       --c-muted: 152 152 157;
+      --c-stage: 11 11 14;
       --bg: #000000;
       --stage: #0b0b0e;
       --stage-glow: rgb(10 132 255 / 0.10);
       --surface: #1c1c1e;
       --fill: rgb(118 118 128 / 0.24);
       --seg-thumb: #636366;
-      --ink-3: #636366;
+      --ink-3: #7c7c80;
       --sep: rgb(84 84 88 / 0.5);
       --shadow: none;
     }
@@ -75,13 +78,14 @@
     --c-accent: 10 132 255;
     --c-ink: 245 245 247;
     --c-muted: 152 152 157;
+    --c-stage: 11 11 14;
     --bg: #000000;
     --stage: #0b0b0e;
     --stage-glow: rgb(10 132 255 / 0.10);
     --surface: #1c1c1e;
     --fill: rgb(118 118 128 / 0.24);
     --seg-thumb: #636366;
-    --ink-3: #636366;
+    --ink-3: #7c7c80;
     --sep: rgb(84 84 88 / 0.5);
     --shadow: none;
   }
@@ -100,7 +104,7 @@
   button, input, textarea { font: inherit; color: inherit; }
   button { cursor: pointer; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .num { font-variant-numeric: tabular-nums; }
 
   /* ---------- Layout ---------- */
   .app {
@@ -117,8 +121,9 @@
   @media (min-width: 700px) {
     .dock { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .composer { grid-column: 1 / -1; }
+    .inspector { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
   }
-  @media (min-width: 1024px) {
+  @media (min-width: 1280px) and (min-height: 720px) {
     html, body { height: 100%; overflow: hidden; }
     .app {
       height: 100%;
@@ -132,10 +137,13 @@
     .dock { grid-row: 3; grid-column: 1; grid-template-columns: 1.25fr 1fr 1fr; height: 286px; }
     .composer { grid-column: auto; }
     .dock > .card { min-height: 0; }
+    .dock .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 4px; }
     .inspector {
-      grid-row: 2 / 4; grid-column: 2;
+      grid-row: 2 / 4; grid-column: 2; grid-template-columns: minmax(0, 1fr);
       overflow-y: auto; overscroll-behavior: contain;
-      padding: 0 4px 8px; margin: 0 -4px;
+      padding: 0 4px 32px; margin: 0 -4px;
+      -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+      mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
       scrollbar-width: thin;
     }
   }
@@ -176,7 +184,7 @@
   .stage canvas:active { cursor: grabbing; }
   .stage canvas:focus-visible { outline-offset: -3px; }
   .overlay { position: absolute; display: flex; gap: 8px; pointer-events: none; }
-  .overlay > * { pointer-events: auto; }
+  .overlay .icon-btn { pointer-events: auto; }
   .overlay.tl { top: 14px; left: 14px; }
   .overlay.tr { top: 14px; right: 14px; }
   .overlay.bl { bottom: 12px; left: 16px; right: 16px; }
@@ -236,11 +244,12 @@
   .vec tbody tr + tr td { border-top: 0.5px solid var(--sep); }
   .vec .axis { color: var(--ink); }
   .vec .axis span { color: var(--ink-2); font-family: var(--mono); margin-right: 6px; }
+  .vec td.h, .vec td.a { padding-left: 12px; }
   .vec td.h { color: var(--human); }
   .vec td.a { color: var(--ai); }
   .vec td.bar { width: 34%; padding-left: 12px; }
   .bars { position: relative; height: 14px; }
-  .bars::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--sep); }
+  .bars::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--ink-3); opacity: 0.5; }
   .bars i { position: absolute; height: 5px; border-radius: 3px; transition: left 0.35s var(--ease), width 0.35s var(--ease); }
   .bars i.h { top: 1px; background: var(--human); }
   .bars i.a { bottom: 1px; background: var(--ai); }
@@ -339,6 +348,7 @@
     border-inline: 1.5px solid var(--ink-2); border-radius: 6px;
     font: 14px/1.6 var(--mono); text-align: right;
   }
+  .matrix { max-width: 100%; }
   .matrix-meta { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-2); margin-top: 10px; }
   .matrix-meta b { color: var(--ink); font-weight: 600; }
 
@@ -363,7 +373,7 @@
         <p>Text becomes a vector. A matrix gives its reflection.</p>
       </div>
     </div>
-    <div class="metrics" aria-label="Live metrics">
+    <div class="metrics" role="group" aria-label="Live metrics">
       <span class="pill">cos <b class="num" id="tCos">—</b></span>
       <span class="pill opt">distance <b class="num" id="tDist">—</b></span>
       <span class="pill">entropy <b class="num" id="tBits">—</b></span>
@@ -371,7 +381,7 @@
   </header>
 
   <section class="stage" aria-label="Vector space">
-    <canvas id="stage" tabindex="0" role="img" aria-label="3D plot of the human vector and its mirror. Drag to orbit, arrow keys rotate, plus and minus zoom, 0 resets."></canvas>
+    <canvas id="stage" tabindex="0" role="application" aria-roledescription="3D plot" aria-label="3D plot of the human vector and its mirror. Drag to orbit, arrow keys rotate, plus and minus zoom, 0 resets."></canvas>
     <div class="overlay tl">
       <div class="legend glass"><span><i class="dot h"></i>Human</span><span><i class="dot a"></i>Mirror</span></div>
     </div>
@@ -392,7 +402,7 @@
         <span class="meta num" id="count">0 words · 0 chars</span>
       </div>
       <textarea id="thought" spellcheck="true" autocomplete="off" placeholder="Write a sentence and watch where it lands."></textarea>
-      <div class="chips" aria-label="Examples">
+      <div class="chips" role="group" aria-label="Examples">
         <button class="chip" type="button" data-sample="0">Warm</button>
         <button class="chip" type="button" data-sample="1">Tense</button>
         <button class="chip" type="button" data-sample="2">Technical</button>
@@ -431,14 +441,14 @@
           <label><input type="radio" name="preset" value="quantum"><span>Quantum</span></label>
         </div>
       </div></div>
-      <p class="foot" id="presetFoot">Custom settings</p>
+      <p class="foot" id="presetFoot">Custom settings.</p>
     </div>
 
     <div class="section">
       <h3 id="opLabel">Operator</h3>
       <div class="group" role="radiogroup" aria-labelledby="opLabel">
         <label class="row op"><input type="radio" name="op" value="invert"><span><span class="t">Inversion</span><span class="s">M = −γ I</span></span><svg class="check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg></label>
-        <label class="row op"><input type="radio" name="op" value="householder"><span><span class="t">Householder reflection</span><span class="s">M = γ (I − 2nnᵀ), n = (cos θ, sin θ, 0)</span></span><svg class="check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg></label>
+        <label class="row op"><input type="radio" name="op" value="householder"><span><span class="t">Householder reflection</span><span class="s">M = γ(I − 2nnᵀ), n at angle θ</span></span><svg class="check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg></label>
         <label class="row op"><input type="radio" name="op" value="rotate"><span><span class="t">Rotation</span><span class="s">M = γ R(θ) about (1,1,1)/√3</span></span><svg class="check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg></label>
         <label class="row op"><input type="radio" name="op" value="attention"><span><span class="t">Softmax attention</span><span class="s">M = −3γ diag(softmax(α V))</span></span><svg class="check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg></label>
       </div>
@@ -458,7 +468,7 @@
     <div class="section">
       <h3>Matrix</h3>
       <div class="group"><div class="row pad">
-        <div class="matrix num" id="matrix" aria-label="Current matrix M"></div>
+        <div class="matrix num" id="matrix" role="group" aria-label="Current matrix M"></div>
         <div class="matrix-meta"><span id="mKind">Linear</span><span>det <b class="num" id="mDet">—</b></span></div>
       </div></div>
     </div>
@@ -586,7 +596,7 @@
   function compute(text, p) {
     const h = analyze(text);
     const M = mirrorMatrix(h, p);
-    const empty = norm(h) === 0;
+    const empty = !text.trim();
     let a = { x: 0, y: 0, z: 0, w: h.w };
     if (!empty) {
       const r = rng(hash(text));
@@ -663,8 +673,8 @@
   };
 
   function readNumber(value, input, fallback) {
-    const n = Number(value);
-    return Number.isFinite(n) ? clamp(n, Number(input.min), Number(input.max)) : fallback;
+    const n = value;
+    return typeof n === 'number' && Number.isFinite(n) ? clamp(n, Number(input.min), Number(input.max)) : fallback;
   }
 
   function restore() {
@@ -681,12 +691,16 @@
   }
 
   let saveTimer = 0;
+  function flush() {
+    clearTimeout(saveTimer);
+    try { localStorage.setItem(STORE, JSON.stringify({ text, params, view })); } catch { /* storage unavailable */ }
+  }
   function save() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      try { localStorage.setItem(STORE, JSON.stringify({ text, params, view })); } catch { /* storage unavailable */ }
-    }, 250);
+    saveTimer = setTimeout(flush, 250);
   }
+  addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 
   /* =====================================================================
      DOM rendering
@@ -710,8 +724,8 @@
     vecCells[key] = { h, a, bh, ba };
     vecBody.appendChild(tr);
   }
-  function setBar(el, v) {
-    const f = Math.min(Math.abs(v) / 2.5, 1) * 50;
+  function setBar(el, v, max) {
+    const f = Math.min(Math.abs(v) / max, 1) * 50;
     el.style.width = f + '%';
     el.style.left = (v < 0 ? 50 - f : 50) + '%';
   }
@@ -766,12 +780,13 @@
     $('count').textContent = `${wordCount} ${wordCount === 1 ? 'word' : 'words'} · ${n} ${n === 1 ? 'char' : 'chars'}`;
 
     const rows = { x: [r.h.x, r.a.x], y: [r.h.y, r.a.y], z: [r.h.z, r.a.z], w: [r.h.w, r.a.w], n: [r.nh, r.na] };
+    const max = Math.max(1, ...Object.values(rows).flat().map(Math.abs));
     for (const [k, [hv, av]] of Object.entries(rows)) {
       const c = vecCells[k];
       c.h.textContent = r.empty ? '—' : fmt(hv);
       c.a.textContent = r.empty ? '—' : fmt(av);
-      setBar(c.bh, r.empty ? 0 : hv);
-      setBar(c.ba, r.empty ? 0 : av);
+      setBar(c.bh, r.empty ? 0 : hv, max);
+      setBar(c.ba, r.empty ? 0 : av, max);
     }
 
     const refl = $('reflection');
@@ -814,7 +829,7 @@
   function readPalette() {
     const cs = getComputedStyle(document.documentElement);
     const t = (name) => cs.getPropertyValue(name).trim().replace(/\s+/g, ' ');
-    palette = { human: t('--c-human'), ai: t('--c-ai'), accent: t('--c-accent'), ink: t('--c-ink'), muted: t('--c-muted') };
+    palette = { human: t('--c-human'), ai: t('--c-ai'), accent: t('--c-accent'), ink: t('--c-ink'), muted: t('--c-muted'), stage: t('--c-stage') };
     fontFamily = getComputedStyle(document.body).fontFamily;
   }
   const rgba = (triplet, a) => `rgba(${triplet.split(' ').join(',')},${a})`;
@@ -826,7 +841,12 @@
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (palette.ink) draw();
   }
+  (function watchDpr() {
+    const mq = matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+    mq.addEventListener?.('change', () => { resize(); watchDpr(); }, { once: true });
+  })();
 
   // Deterministic particle cloud inside a sphere of radius 1.6.
   const particles = (() => {
@@ -841,13 +861,14 @@
   })();
   let drift = 0;
 
-  let cy = 1, sy = 0, cp = 1, sp = 0, scale = 1;
+  let cy = 1, sy = 0, cp = 1, sp = 0, scale = 1, fit = 1;
   function project(x, y, z) {
+    x *= fit; y *= fit; z *= fit;
     const x1 = x * cy + z * sy;
     const z1 = -x * sy + z * cy;
     const y2 = y * cp - z1 * sp;
     const z2 = y * sp + z1 * cp;
-    const k = CAM_DIST / (CAM_DIST - z2);
+    const k = CAM_DIST / Math.max(1.5, CAM_DIST - z2);
     return { x: W / 2 + x1 * scale * k, y: H / 2 - y2 * scale * k, z: z2, k };
   }
   function line(a, b) { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
@@ -855,9 +876,18 @@
   function draw() {
     cy = Math.cos(cam.yaw); sy = Math.sin(cam.yaw);
     cp = Math.cos(cam.pitch); sp = Math.sin(cam.pitch);
-    scale = Math.min(W, H) * 0.22 * cam.zoom;
+    const reach = Math.max(1.5, 1.1 * Math.hypot(shown.h.x, shown.h.y, shown.h.z), 1.1 * Math.hypot(shown.a.x, shown.a.y, shown.a.z));
+    fit = 1.5 / reach;
+    scale = Math.min(W, H) * 0.27 * cam.zoom;
     ctx.clearRect(0, 0, W, H);
-    const { human, ai, accent, ink, muted } = palette;
+    const { human, ai, accent, ink, muted, stage } = palette;
+    const label = (str, x, y, color) => {
+      ctx.lineWidth = 4; ctx.lineJoin = 'round';
+      ctx.strokeStyle = rgba(stage, 0.85);
+      ctx.strokeText(str, x, y);
+      ctx.fillStyle = color;
+      ctx.fillText(str, x, y);
+    };
     const o = project(0, 0, 0);
     const hasVec = !result.empty;
 
@@ -900,13 +930,12 @@
     ctx.font = `500 11px ${fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    for (const [v, label] of [[[1.3, 0, 0], 'Valence'], [[0, 1.3, 0], 'Complexity'], [[0, 0, 1.3], 'Entropy']]) {
+    for (const [v, name] of [[[1.3, 0, 0], 'Valence'], [[0, 1.3, 0], 'Complexity'], [[0, 0, 1.3], 'Entropy']]) {
       ctx.strokeStyle = rgba(muted, 0.55);
       const end = project(...v);
       line(project(-v[0] * 0.25, -v[1] * 0.25, -v[2] * 0.25), end);
       const tip = project(v[0] * 1.14, v[1] * 1.14, v[2] * 1.14);
-      ctx.fillStyle = rgba(muted, 0.95);
-      ctx.fillText(label, tip.x, tip.y);
+      label(name, tip.x, tip.y, rgba(muted, 0.95));
     }
 
     if (!hasVec) {
@@ -934,13 +963,13 @@
     }
 
     const vectors = [
-      { p: ph, v: shown.h, color: human, label: 'Human' },
-      { p: pa, v: shown.a, color: ai, label: 'Mirror' },
+      { p: ph, v: shown.h, color: human, name: 'Human' },
+      { p: pa, v: shown.a, color: ai, name: 'Mirror' },
     ].sort((a, b) => a.p.z - b.p.z);
 
     ctx.font = `600 12px ${fontFamily}`;
     ctx.textAlign = 'left';
-    for (const { p, v, color, label } of vectors) {
+    for (const { p, v, color, name } of vectors) {
       const grad = ctx.createLinearGradient(o.x, o.y, p.x, p.y);
       grad.addColorStop(0, rgba(color, 0.15));
       grad.addColorStop(1, rgba(color, 1));
@@ -955,8 +984,9 @@
       ctx.fillStyle = rgba(color, 1);
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
-      ctx.fillStyle = rgba(color, 1);
-      ctx.fillText(label, p.x + r + 7, p.y - r - 2);
+      const tw = ctx.measureText(name).width;
+      const lx = p.x + r + 7 + tw > W - 10 ? p.x - r - 7 - tw : p.x + r + 7;
+      label(name, lx, Math.max(14, p.y - r - 2), rgba(color, 1));
     }
 
     ctx.fillStyle = rgba(accent, 0.9);
@@ -965,6 +995,7 @@
 
   let last = performance.now();
   function frame(now) {
+    requestAnimationFrame(frame);
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     const k = reduceMotion ? 1 : 1 - Math.exp(-dt * 9);
@@ -979,7 +1010,7 @@
       cam.yaw += dy * hk;
       cam.pitch += (CAM_HOME.pitch - cam.pitch) * hk;
       cam.zoom += (CAM_HOME.zoom - cam.zoom) * hk;
-      if (Math.abs(dy) < 1e-3 && Math.abs(CAM_HOME.pitch - cam.pitch) < 1e-3 && Math.abs(CAM_HOME.zoom - cam.zoom) < 1e-3) cam.homing = false;
+      if (Math.abs(dy) < 1e-3 && Math.abs(CAM_HOME.pitch - cam.pitch) < 1e-3 && Math.abs(CAM_HOME.zoom - cam.zoom) < 1e-3) { Object.assign(cam, CAM_HOME); cam.homing = false; }
     } else if (!drag.active) {
       cam.yaw += cam.vYaw * dt;
       cam.pitch = clamp(cam.pitch + cam.vPitch * dt, -1.35, 1.35);
@@ -990,13 +1021,13 @@
     if (view.particles && !reduceMotion) drift += dt * 0.04;
 
     if (stageVisible && !document.hidden) draw();
-    requestAnimationFrame(frame);
   }
 
   /* ---- Pointer, wheel and keyboard camera control ---- */
   const drag = { active: false, pointers: new Map(), pinch: 0, zoom: 1, lastT: 0, tapT: 0, tapX: 0, tapY: 0, moved: 0 };
 
   canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     canvas.setPointerCapture(e.pointerId);
     drag.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     drag.active = true;
@@ -1046,13 +1077,17 @@
   }
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('lostpointercapture', endPointer);
   canvas.addEventListener('wheel', (e) => {
+    const pageScrolls = document.documentElement.scrollHeight > innerHeight + 1;
+    if (pageScrolls && !e.ctrlKey && !e.metaKey && document.activeElement !== canvas) return; // let the page scroll
     e.preventDefault();
     cam.homing = false;
     const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
     cam.zoom = clamp(cam.zoom * Math.exp(-delta * 0.0015), 0.45, 3);
   }, { passive: false });
   canvas.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     const step = { ArrowLeft: [-0.12, 0], ArrowRight: [0.12, 0], ArrowUp: [0, -0.1], ArrowDown: [0, 0.1] }[e.key];
     if (step) {
       cam.homing = false;
