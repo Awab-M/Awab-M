@@ -1,17 +1,21 @@
 ### Awab M
 
-IT professional in Durham Region, Ontario.
+IT professional and software builder in Durham Region, Ontario.
 
-**By day** — C#/.NET against Microsoft Dynamics 365 Finance & Operations and
-Oracle/IQMS manufacturing systems: enterprise backend tooling, integrations,
-and the automation around them.
+I build practical systems for small businesses and technical teams — from customer-facing ordering sites to internal portals, workflow automation, and AI-assisted developer tooling.
 
-**The rest of the time** — small, real systems for small, real businesses.
-A wholesale ordering portal that runs on SQLite or PostgreSQL from one
-codebase. An unattended invoice mailer with enough safety rails to be left
-alone. A bakery storefront and its kitchen dashboard.
+**Selected work**
+- **Bake It Easy Desserts** — live pre-order storefront and kitchen order dashboard: https://bakeiteasydesserts.com
+- **S.A. Canada wholesale portal** — B2B catalogue, customer ordering, admin/back-office workflows, invoicing and payment ledger.
+- **InvoiceMailer** — C#/.NET service for generating invoice PDFs from SQL data and sending them automatically.
+- **AI-Awab / Awab Lab** — FastAPI/React, vector memory, agent observation, provenance tracking, auditing, and interactive experiments.
 
-Most of my repositories are private client and business work, so this profile
-is quieter than the workload.
+**Core stack**
 
-`C#` · `.NET` · `Node` · `TypeScript` · `SQL Server` · `Oracle` · `PostgreSQL` · `Three.js`
+`C#` · `.NET` · `React` · `TypeScript` · `Node.js` · `Python` · `SQL Server` · `PostgreSQL` · `Oracle` · `Docker` · `Three.js`
+
+**Open to**
+
+Software development, web builds, business workflow automation, technical fixes, and contract work.
+
+Most production/client repositories are private. This profile shows the public surface of the work; demos and sanitized case studies are being added as they are ready.
