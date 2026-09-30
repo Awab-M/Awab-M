@@ -1,0 +1,1152 @@
+<!doctype html><!--shell-->
+<html lang="en"><!--shell-->
+<head><!--shell-->
+<meta charset="utf-8"><!--shell-->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><!--shell-->
+<meta name="description" content="Type a thought, watch it become a vector, and see its mirror image under a transformation you control."><!--shell-->
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)"><!--shell-->
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)"><!--shell-->
+<meta name="apple-mobile-web-app-capable" content="yes"><!--shell-->
+<meta name="mobile-web-app-capable" content="yes"><!--shell-->
+<meta name="apple-mobile-web-app-status-bar-style" content="default"><!--shell-->
+<meta name="apple-mobile-web-app-title" content="Mirror"><!--shell-->
+<link rel="manifest" href="manifest.webmanifest"><!--shell-->
+<link rel="icon" href="icon.svg" type="image/svg+xml"><!--shell-->
+<link rel="apple-touch-icon" href="icon-180.png"><!--shell-->
+<title>Cognitive Mirror</title>
+<style>
+  :root {
+    color-scheme: light;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+    /* Canvas colours are stored as RGB triplets so the renderer can apply alpha. */
+    --c-human: 36 138 61;
+    --c-ai: 215 0 21;
+    --c-accent: 0 122 255;
+    --c-ink: 29 29 31;
+    --c-muted: 110 110 115;
+    --c-stage: 251 251 253;
+
+    --bg: #f2f2f7;
+    --stage: #fbfbfd;
+    --stage-glow: rgb(0 122 255 / 0.06);
+    --surface: #ffffff;
+    --fill: rgb(118 118 128 / 0.12);
+    --seg-thumb: #ffffff;
+    --ink: rgb(var(--c-ink));
+    --ink-2: rgb(var(--c-muted));
+    --ink-3: #aeaeb2;
+    --sep: rgb(60 60 67 / 0.14);
+    --human: rgb(var(--c-human));
+    --ai: rgb(var(--c-ai));
+    --accent: rgb(var(--c-accent));
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.04);
+    --radius-l: 22px;
+    --radius-m: 16px;
+    --radius-s: 10px;
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .app { padding-left: max(16px, env(safe-area-inset-left, 0px)) !important; padding-right: max(16px, env(safe-area-inset-right, 0px)) !important; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --c-human: 48 209 88;
+      --c-ai: 255 55 95;
+      --c-accent: 10 132 255;
+      --c-ink: 245 245 247;
+      --c-muted: 152 152 157;
+      --c-stage: 11 11 14;
+      --bg: #000000;
+      --stage: #0b0b0e;
+      --stage-glow: rgb(10 132 255 / 0.10);
+      --surface: #1c1c1e;
+      --fill: rgb(118 118 128 / 0.24);
+      --seg-thumb: #636366;
+      --ink-3: #7c7c80;
+      --sep: rgb(84 84 88 / 0.5);
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --c-human: 48 209 88;
+    --c-ai: 255 55 95;
+    --c-accent: 10 132 255;
+    --c-ink: 245 245 247;
+    --c-muted: 152 152 157;
+    --c-stage: 11 11 14;
+    --bg: #000000;
+    --stage: #0b0b0e;
+    --stage-glow: rgb(10 132 255 / 0.10);
+    --surface: #1c1c1e;
+    --fill: rgb(118 118 128 / 0.24);
+    --seg-thumb: #636366;
+    --ink-3: #7c7c80;
+    --sep: rgb(84 84 88 / 0.5);
+    --shadow: none;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { height: 100%; box-sizing: border-box; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.45 var(--font);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- Layout ---------- */
+  .app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 8px 16px 20px;
+    max-width: 1680px;
+    margin: 0 auto;
+  }
+  .dock { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+  .inspector { display: grid; gap: 20px; align-content: start; padding-top: 8px; }
+
+  @media (min-width: 700px) {
+    .dock { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .composer { grid-column: 1 / -1; }
+    .inspector { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+  }
+  @media (min-width: 1280px) and (min-height: 720px) {
+    html, body { height: 100%; overflow: hidden; }
+    .app {
+      height: 100%;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      padding: 8px 20px 20px;
+      column-gap: 20px;
+    }
+    .toolbar { grid-column: 1 / -1; }
+    .app > .stage { grid-row: 2; grid-column: 1; height: auto; min-height: 300px; }
+    .dock { grid-row: 3; grid-column: 1; grid-template-columns: 1.25fr 1fr 1fr; height: 286px; }
+    .composer { grid-column: auto; }
+    .dock > .card { min-height: 0; }
+    .dock .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 4px; }
+    .inspector {
+      grid-row: 2 / 4; grid-column: 2; grid-template-columns: minmax(0, 1fr);
+      overflow-y: auto; overscroll-behavior: contain;
+      padding: 0 4px 32px; margin: 0 -4px;
+      -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+      mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+      scrollbar-width: thin;
+    }
+  }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    min-height: 48px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand svg { flex: none; }
+  .brand h1 {
+    margin: 0; font: 600 19px/1.1 var(--font-display); letter-spacing: -0.02em;
+  }
+  .brand p { margin: 0; color: var(--ink-2); font-size: 13px; }
+  .metrics { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    padding: 5px 11px; border-radius: 999px; background: var(--fill);
+    font-size: 12px; color: var(--ink-2); white-space: nowrap;
+  }
+  .pill b { font-weight: 600; color: var(--ink); }
+  @media (max-width: 520px) { .brand p, .pill.opt { display: none; } }
+
+  /* ---------- Stage ---------- */
+  .stage {
+    position: relative; overflow: hidden;
+    height: 56vh; height: min(56svh, 560px); min-height: 300px;
+    border-radius: var(--radius-l);
+    background: radial-gradient(120% 90% at 50% 40%, var(--stage-glow), transparent 60%), var(--stage);
+    box-shadow: var(--shadow);
+    isolation: isolate;
+  }
+  .stage canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    display: block; touch-action: none; cursor: grab; border-radius: inherit;
+  }
+  .stage canvas:active { cursor: grabbing; }
+  .stage canvas:focus-visible { outline-offset: -3px; }
+  .overlay { position: absolute; display: flex; gap: 8px; pointer-events: none; }
+  .overlay .icon-btn { pointer-events: auto; }
+  .overlay.tl { top: 14px; left: 14px; }
+  .overlay.tr { top: 14px; right: 14px; }
+  .overlay.bl { bottom: 12px; left: 16px; right: 16px; }
+  .glass {
+    background: var(--surface);
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border: 0.5px solid var(--sep);
+  }
+  .legend { display: flex; gap: 12px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+  .dot.h { background: var(--human); }
+  .dot.a { background: var(--ai); }
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    padding: 0; color: var(--ink);
+    transition: transform 0.2s var(--ease);
+  }
+  .icon-btn:active { transform: scale(0.92); }
+  .hint { font-size: 12px; color: var(--ink-2); }
+  @media (hover: none) { .hint .mouse { display: none; } }
+  @media (hover: hover) { .hint .touch { display: none; } }
+
+  /* ---------- Cards ---------- */
+  .card {
+    background: var(--surface); border-radius: var(--radius-m);
+    padding: 16px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .card-head h2 { margin: 0; font: 600 15px/1.2 var(--font-display); letter-spacing: -0.01em; }
+  .card-head .meta { font-size: 12px; color: var(--ink-2); }
+
+  .composer textarea {
+    flex: 1; min-height: 120px; width: 100%; resize: none;
+    border: 0; border-radius: var(--radius-s); background: var(--fill);
+    padding: 12px 14px; font-size: 17px; line-height: 1.4;
+    transition: box-shadow 0.2s var(--ease);
+  }
+  .composer textarea::placeholder { color: var(--ink-3); }
+  .composer textarea:focus { outline: none; box-shadow: 0 0 0 3px rgb(var(--c-accent) / 0.35); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .chip {
+    border: 0; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 500;
+    background: var(--fill); color: var(--ink);
+    transition: transform 0.2s var(--ease), background-color 0.2s;
+  }
+  .chip:hover { background: rgb(var(--c-accent) / 0.12); color: var(--accent); }
+  .chip:active { transform: scale(0.96); }
+  .chip.clear { margin-left: auto; background: transparent; color: var(--accent); padding-inline: 6px; }
+
+  .vec { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .vec th, .vec td { padding: 6px 0; text-align: right; font-weight: 400; }
+  .vec th:first-child, .vec td:first-child { text-align: left; }
+  .vec thead th { font-size: 12px; color: var(--ink-2); font-weight: 500; }
+  .vec tbody tr + tr td { border-top: 0.5px solid var(--sep); }
+  .vec .axis { color: var(--ink); }
+  .vec .axis span { color: var(--ink-2); font-family: var(--mono); margin-right: 6px; }
+  .vec td.h, .vec td.a { padding-left: 12px; }
+  .vec td.h { color: var(--human); }
+  .vec td.a { color: var(--ai); }
+  .vec td.bar { width: 34%; padding-left: 12px; }
+  .bars { position: relative; height: 14px; }
+  .bars::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--ink-3); opacity: 0.5; }
+  .bars i { position: absolute; height: 5px; border-radius: 3px; transition: left 0.35s var(--ease), width 0.35s var(--ease); }
+  .bars i.h { top: 1px; background: var(--human); }
+  .bars i.a { bottom: 1px; background: var(--ai); }
+
+  .reflection {
+    flex: 1; min-height: 64px; margin: 0; overflow: auto;
+    padding: 12px 14px; border-radius: var(--radius-s); background: var(--fill);
+    font: 14px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .reflection.empty { color: var(--ink-3); font-family: var(--font); }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; }
+  .stats div { min-width: 0; }
+  .stats dt { font-size: 11px; color: var(--ink-2); letter-spacing: 0.02em; }
+  .stats dd { margin: 2px 0 0; font-size: 14px; font-weight: 600; }
+
+  /* ---------- Inspector (inset grouped lists) ---------- */
+  .section h3 {
+    margin: 0 0 6px 16px; font-size: 12px; font-weight: 500; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--ink-2);
+  }
+  .section .foot { margin: 6px 16px 0; font-size: 12px; color: var(--ink-2); }
+  .group { background: var(--surface); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+  .row {
+    position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    min-height: 44px; padding: 8px 16px;
+  }
+  .row + .row::before {
+    content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 0.5px; background: var(--sep);
+  }
+  label.row { cursor: pointer; }
+  .row.pad { display: block; padding-block: 12px; }
+  .row.danger { width: 100%; border: 0; background: none; justify-content: center; color: var(--ai); font-weight: 500; }
+
+  .seg {
+    position: relative; display: grid; grid-template-columns: repeat(4, 1fr);
+    padding: 2px; border-radius: 9px; background: var(--fill);
+  }
+  .seg label { position: relative; cursor: pointer; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg span {
+    display: block; text-align: center; padding: 6px 2px; border-radius: 7px;
+    font-size: 13px; font-weight: 500; transition: background-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+  }
+  .seg input:checked + span { background: var(--seg-thumb); box-shadow: 0 3px 8px rgb(0 0 0 / 0.12), 0 0 0 0.5px rgb(0 0 0 / 0.04); font-weight: 600; }
+  .seg input:focus-visible + span { outline: 2px solid var(--accent); }
+
+  .op input { position: absolute; opacity: 0; pointer-events: none; }
+  .op .t { display: block; font-size: 15px; }
+  .op .s { display: block; font-size: 12px; color: var(--ink-2); font-family: var(--mono); }
+  .op .check { color: var(--accent); opacity: 0; transition: opacity 0.2s; flex: none; }
+  .op input:checked ~ .check { opacity: 1; }
+  .op:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .slider .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .slider .head output { color: var(--ink-2); font-size: 13px; }
+  .slider.off { opacity: 0.4; }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 28px; margin: 0;
+    background: transparent; cursor: pointer; --p: 50%;
+  }
+  input[type="range"]:disabled { cursor: default; }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, var(--accent) var(--p), var(--fill) var(--p));
+  }
+  input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--fill); }
+  input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 26px; height: 26px; margin-top: -11px; border-radius: 50%;
+    background: #fff; border: 0; box-shadow: 0 0.5px 4px rgb(0 0 0 / 0.12), 0 6px 13px rgb(0 0 0 / 0.12);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 0;
+    box-shadow: 0 0.5px 4px rgb(0 0 0 / 0.12), 0 6px 13px rgb(0 0 0 / 0.12);
+  }
+  input[type="range"]:focus-visible { outline: none; }
+  input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgb(var(--c-accent) / 0.45); }
+  input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px rgb(var(--c-accent) / 0.45); }
+
+  .switch {
+    -webkit-appearance: none; appearance: none; flex: none; margin: 0;
+    width: 51px; height: 31px; border-radius: 999px; background: var(--fill);
+    position: relative; cursor: pointer; transition: background-color 0.25s var(--ease);
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%;
+    background: #fff; box-shadow: 0 3px 8px rgb(0 0 0 / 0.15), 0 1px 1px rgb(0 0 0 / 0.16);
+    transition: transform 0.25s var(--ease);
+  }
+  .switch:checked { background: rgb(var(--c-human)); }
+  .switch:checked::after { transform: translateX(20px); }
+
+  .matrix {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px;
+    padding: 6px 14px; margin: 0 auto; width: max-content; min-width: 70%;
+    border-inline: 1.5px solid var(--ink-2); border-radius: 6px;
+    font: 14px/1.6 var(--mono); text-align: right;
+  }
+  .matrix { max-width: 100%; }
+  .matrix-meta { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+  .matrix-meta b { color: var(--ink); font-weight: 600; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head><!--shell-->
+<body><!--shell-->
+<div class="app">
+  <header class="toolbar">
+    <div class="brand">
+      <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" style="fill:var(--ink)"/>
+        <path d="M15 8a8 8 0 0 0 0 16z" style="fill:var(--human)"/>
+        <path d="M17 8a8 8 0 0 1 0 16z" style="fill:var(--ai)"/>
+      </svg>
+      <div>
+        <h1>Cognitive Mirror</h1>
+        <p>Text becomes a vector. A matrix gives its reflection.</p>
+      </div>
+    </div>
+    <div class="metrics" role="group" aria-label="Live metrics">
+      <span class="pill">cos <b class="num" id="tCos">—</b></span>
+      <span class="pill opt">distance <b class="num" id="tDist">—</b></span>
+      <span class="pill">entropy <b class="num" id="tBits">—</b></span>
+    </div>
+  </header>
+
+  <section class="stage" aria-label="Vector space">
+    <canvas id="stage" tabindex="0" role="application" aria-roledescription="3D plot" aria-label="3D plot of the human vector and its mirror. Drag to orbit, arrow keys rotate, plus and minus zoom, 0 resets."></canvas>
+    <div class="overlay tl">
+      <div class="legend glass"><span><i class="dot h"></i>Human</span><span><i class="dot a"></i>Mirror</span></div>
+    </div>
+    <div class="overlay tr">
+      <button class="icon-btn glass" id="resetCam" type="button" aria-label="Reset camera" title="Reset camera">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="5.2"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/></svg>
+      </button>
+    </div>
+    <div class="overlay bl">
+      <span class="hint"><span class="mouse">Drag to orbit · Scroll to zoom · Double-click to reset</span><span class="touch">Drag to orbit · Pinch to zoom · Double-tap to reset</span></span>
+    </div>
+  </section>
+
+  <div class="dock">
+    <section class="card composer">
+      <div class="card-head">
+        <h2><label for="thought">Your thought</label></h2>
+        <span class="meta num" id="count">0 words · 0 chars</span>
+      </div>
+      <textarea id="thought" spellcheck="true" autocomplete="off" placeholder="Write a sentence and watch where it lands."></textarea>
+      <div class="chips" role="group" aria-label="Examples">
+        <button class="chip" type="button" data-sample="0">Warm</button>
+        <button class="chip" type="button" data-sample="1">Tense</button>
+        <button class="chip" type="button" data-sample="2">Technical</button>
+        <button class="chip clear" type="button" id="clear">Clear</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Vectors</h2><span class="meta">V<sub>H</sub> → M·V<sub>H</sub></span></div>
+      <table class="vec">
+        <thead><tr><th scope="col">Axis</th><th scope="col">Human</th><th scope="col">Mirror</th><th scope="col" class="bar"><span class="sr-only">Comparison</span></th></tr></thead>
+        <tbody id="vecBody"></tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Reflection</h2><span class="meta">Atbash mirror of your text</span></div>
+      <p class="reflection empty" id="reflection">Your reflection appears here.</p>
+      <dl class="stats">
+        <div><dt>Cosine</dt><dd class="num" id="sCos">—</dd></div>
+        <div><dt>Angle</dt><dd class="num" id="sAngle">—</dd></div>
+        <div><dt>Distance</dt><dd class="num" id="sDist">—</dd></div>
+        <div><dt>det M</dt><dd class="num" id="sDet">—</dd></div>
+      </dl>
+    </section>
+  </div>
+
+  <aside class="inspector" aria-label="Controls">
+    <div class="section">
+      <h3 id="presetLabel">Preset</h3>
+      <div class="group"><div class="row pad">
+        <div class="seg" role="radiogroup" aria-labelledby="presetLabel">
+          <label><input type="radio" name="preset" value="exact"><span>Exact</span></label>
+          <label><input type="radio" name="preset" value="harmonic"><span>Harmonic</span></label>
+          <label><input type="radio" name="preset" value="chaos"><span>Chaos</span></label>
+          <label><input type="radio" name="preset" value="quantum"><span>Quantum</span></label>
+        </div>
+      </div></div>
+      <p class="foot" id="presetFoot">Custom settings.</p>
+    </div>
+
+    <div class="section">
+      <h3 id="opLabel">Operator</h3>
+      <div class="group" role="radiogroup" aria-labelledby="opLabel">
+        <label class="row op"><input type="radio" name="op" value="invert"><span><span class="t">Inversion</span><span class="s">M = −γ I</span></span><svg class="check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg></label>
+        <label class="row op"><input type="radio" name="op" value="householder"><span><span class="t">Householder reflection</span><span class="s">M = γ(I − 2nnᵀ), n at angle θ</span></span><svg class="check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg></label>
+        <label class="row op"><input type="radio" name="op" value="rotate"><span><span class="t">Rotation</span><span class="s">M = γ R(θ) about (1,1,1)/√3</span></span><svg class="check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg></label>
+        <label class="row op"><input type="radio" name="op" value="attention"><span><span class="t">Softmax attention</span><span class="s">M = −3γ diag(softmax(α V))</span></span><svg class="check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg></label>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Parameters</h3>
+      <div class="group">
+        <div class="row pad slider" id="row-gain"><div class="head"><label for="gain">Gain γ</label><output class="num" for="gain" id="gainOut"></output></div><input type="range" id="gain" min="0.1" max="2.5" step="0.05"></div>
+        <div class="row pad slider" id="row-theta"><div class="head"><label for="theta">Angle θ</label><output class="num" for="theta" id="thetaOut"></output></div><input type="range" id="theta" min="0" max="360" step="1"></div>
+        <div class="row pad slider" id="row-focus"><div class="head"><label for="focus">Focus α</label><output class="num" for="focus" id="focusOut"></output></div><input type="range" id="focus" min="0" max="4" step="0.1"></div>
+        <div class="row pad slider" id="row-noise"><div class="head"><label for="noise">Noise σ</label><output class="num" for="noise" id="noiseOut"></output></div><input type="range" id="noise" min="0" max="0.5" step="0.01"></div>
+      </div>
+      <p class="foot" id="paramFoot"></p>
+    </div>
+
+    <div class="section">
+      <h3>Matrix</h3>
+      <div class="group"><div class="row pad">
+        <div class="matrix num" id="matrix" role="group" aria-label="Current matrix M"></div>
+        <div class="matrix-meta"><span id="mKind">Linear</span><span>det <b class="num" id="mDet">—</b></span></div>
+      </div></div>
+    </div>
+
+    <div class="section">
+      <h3>View</h3>
+      <div class="group">
+        <label class="row"><span>Auto-rotate</span><input type="checkbox" class="switch" role="switch" id="autoSpin"></label>
+        <div class="row pad slider" id="row-speed"><div class="head"><label for="speed">Rotation speed</label><output class="num" for="speed" id="speedOut"></output></div><input type="range" id="speed" min="0.1" max="2" step="0.1"></div>
+        <label class="row"><span>Grid</span><input type="checkbox" class="switch" role="switch" id="grid"></label>
+        <label class="row"><span>Attention field</span><input type="checkbox" class="switch" role="switch" id="particles"></label>
+        <label class="row"><span>Guides</span><input type="checkbox" class="switch" role="switch" id="guides"></label>
+      </div>
+      <p class="foot">X is valence, Y is complexity, Z is character entropy. Dot size is text length.</p>
+    </div>
+
+    <div class="section">
+      <div class="group"><button class="row danger" type="button" id="resetAll">Reset everything</button></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+'use strict';
+(() => {
+  /* =====================================================================
+     Engine — pure functions, no DOM.
+     ===================================================================== */
+  const DEG = Math.PI / 180;
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const clamp01 = (v) => clamp(v, 0, 1);
+
+  const words = (s) => new Set(s.split(' '));
+  const POSITIVE = words('love loved lovely like liked enjoy enjoyed good great excellent amazing awesome wonderful beautiful happy happiness joy glad calm peace peaceful quiet kind gentle hope hopeful bright best better brilliant fantastic nice fun grateful thank thanks thankful proud strong win won success successful clear free warm fair easy delight delighted excited inspiring inspired curious trust safe perfect agree comfort comfortable smile laugh relaxed rest');
+  const NEGATIVE = words('hate hated dislike bad worse worst awful terrible horrible sad angry anger upset fear afraid scared anxious anxiety worry worried stress stressed tired pain hurt broken lost lose losing fail failed failure wrong unfair impossible hard difficult ugly cold alone lonely sick dark boring annoying annoyed frustrated frustrating mess problem problems cry bitter confused dread exhausted overwhelmed');
+  const NEGATORS = words("not no never nothing none nobody neither nor cannot can't don't doesn't didn't isn't aren't wasn't weren't won't wouldn't shouldn't without hardly");
+
+  /** Maps text to V = (valence, complexity, entropy) plus density w. */
+  function analyze(raw) {
+    const text = raw.replace(/[‘’]/g, "'");
+    const chars = Array.from(text);
+    const blank = { x: 0, y: 0, z: 0, w: 0, bits: 0, words: 0, chars: chars.length };
+    if (!text.trim()) return blank;
+
+    const tokens = text.toLowerCase().match(/[a-z']+/g) || [];
+    let score = 0;
+    tokens.forEach((t, i) => {
+      let s = POSITIVE.has(t) ? 1 : NEGATIVE.has(t) ? -1 : 0;
+      if (s && (NEGATORS.has(tokens[i - 1]) || NEGATORS.has(tokens[i - 2]))) s *= -0.8;
+      score += s;
+    });
+    const bangs = Math.min(3, (text.match(/!/g) || []).length);
+    const x = Math.tanh((1.6 * score * (1 + 0.15 * bangs)) / Math.sqrt(tokens.length + 1));
+
+    const avgLen = tokens.length ? tokens.join('').length / tokens.length : 0;
+    const diversity = tokens.length ? new Set(tokens).size / tokens.length : 0;
+    const y = clamp01(0.55 * clamp01((avgLen - 2) / 6) + 0.45 * diversity);
+
+    const freq = new Map();
+    for (const c of chars) freq.set(c, (freq.get(c) || 0) + 1);
+    let bits = 0;
+    for (const n of freq.values()) { const p = n / chars.length; bits -= p * Math.log2(p); }
+    const z = clamp01(bits / 4.7);
+    const w = clamp01(Math.log10(chars.length + 1) / 3);
+
+    return { x, y, z, w, bits, words: text.trim().split(/\s+/).length, chars: chars.length };
+  }
+
+  function softmax(v) {
+    const m = Math.max(...v);
+    const e = v.map((q) => Math.exp(q - m));
+    const s = e.reduce((a, b) => a + b, 0);
+    return e.map((q) => q / s);
+  }
+
+  /** The 3×3 matrix M for the current operator. Attention is input-dependent. */
+  function mirrorMatrix(v, p) {
+    const c = Math.cos(p.theta * DEG), s = Math.sin(p.theta * DEG);
+    let B;
+    switch (p.op) {
+      case 'householder': {
+        const n = [c, s, 0];
+        B = n.map((ni, i) => n.map((nj, j) => (i === j ? 1 : 0) - 2 * ni * nj));
+        break;
+      }
+      case 'rotate': {
+        const k = 1 / Math.sqrt(3), kt = k * k * (1 - c), ks = k * s;
+        B = [[c + kt, kt - ks, kt + ks], [kt + ks, c + kt, kt - ks], [kt - ks, kt + ks, c + kt]];
+        break;
+      }
+      case 'attention': {
+        const a = softmax([v.x, v.y, v.z].map((q) => q * p.focus));
+        B = [[-3 * a[0], 0, 0], [0, -3 * a[1], 0], [0, 0, -3 * a[2]]];
+        break;
+      }
+      default:
+        B = [[-1, 0, 0], [0, -1, 0], [0, 0, -1]];
+    }
+    return B.map((r) => r.map((q) => q * p.gain + 0)); // + 0 turns −0 into 0
+  }
+
+  const det3 = (m) =>
+    m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+    m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+    m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+
+  function hash(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const norm = (v) => Math.hypot(v.x, v.y, v.z);
+
+  /** Full pipeline: text + params → vectors, matrix and comparison metrics. */
+  function compute(text, p) {
+    const h = analyze(text);
+    const M = mirrorMatrix(h, p);
+    const empty = !text.trim();
+    let a = { x: 0, y: 0, z: 0, w: h.w };
+    if (!empty) {
+      const r = rng(hash(text));
+      const n = [0, 0, 0].map(() => (r() * 2 - 1) * p.noise);
+      const hv = [h.x, h.y, h.z];
+      const out = M.map((row, i) => row[0] * hv[0] + row[1] * hv[1] + row[2] * hv[2] + n[i]);
+      a = { x: out[0], y: out[1], z: out[2], w: h.w };
+    }
+    const nh = norm(h), na = norm(a);
+    const cos = nh > 0 && na > 0 ? clamp((h.x * a.x + h.y * a.y + h.z * a.z) / (nh * na), -1, 1) : null;
+    return {
+      h, a, M, nh, na, empty,
+      det: det3(M),
+      cos,
+      angle: cos === null ? null : Math.acos(cos) / DEG,
+      dist: empty ? null : Math.hypot(h.x - a.x, h.y - a.y, h.z - a.z),
+    };
+  }
+
+  /** Atbash mirror: a↔z, 0↔9, with mirrored punctuation. */
+  function mirrorText(text) {
+    const map = { '.': '∴', '?': '¿', '!': '¡', '(': ')', ')': '(', '[': ']', ']': '[', '{': '}', '}': '{', '<': '>', '>': '<' };
+    let out = '';
+    for (const ch of text) {
+      const c = ch.charCodeAt(0);
+      if (c >= 97 && c <= 122) out += String.fromCharCode(219 - c);
+      else if (c >= 65 && c <= 90) out += String.fromCharCode(155 - c);
+      else if (c >= 48 && c <= 57) out += String.fromCharCode(105 - c);
+      else out += map[ch] || ch;
+    }
+    return out;
+  }
+
+  // Expose the pure engine for testing and console exploration.
+  window.CognitiveMirror = Object.freeze({ analyze, mirrorMatrix, det3, compute, mirrorText });
+
+  /* =====================================================================
+     State
+     ===================================================================== */
+  const $ = (id) => document.getElementById(id);
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const OPS = ['invert', 'householder', 'rotate', 'attention'];
+  const USES_THETA = new Set(['householder', 'rotate']);
+  const PARAMS = ['gain', 'theta', 'focus', 'noise'];
+  const PARAM_DEFAULTS = { op: 'invert', gain: 1, theta: 180, focus: 1, noise: 0 };
+  const VIEW_DEFAULTS = { autoSpin: !reduceMotion, speed: 0.5, grid: true, particles: true, guides: true };
+  const PRESETS = {
+    exact: { op: 'invert', gain: 1, theta: 180, focus: 1, noise: 0 },
+    harmonic: { op: 'householder', gain: 1, theta: 45, focus: 1, noise: 0 },
+    chaos: { op: 'rotate', gain: 1.4, theta: 135, focus: 1, noise: 0.25 },
+    quantum: { op: 'attention', gain: 1.2, theta: 180, focus: 2.5, noise: 0.1 },
+  };
+  const PRESET_NOTES = {
+    exact: 'Every axis flips sign. The mirror points straight back.',
+    harmonic: 'Reflects across the plane at 45°. Entropy is left unchanged.',
+    chaos: 'Rotates 135° around the diagonal, amplified, with noise.',
+    quantum: 'The strongest axis takes most of the attention and is inverted hardest.',
+  };
+  const SAMPLES = [
+    'I love how quiet and bright the morning feels.',
+    "I don't feel good about this. It's a mess and I'm exhausted!",
+    'Recursive attention layers approximate kernelized similarity across token embeddings.',
+  ];
+  const STORE = 'cognitive-mirror.v1';
+
+  const params = { ...PARAM_DEFAULTS };
+  const view = { ...VIEW_DEFAULTS };
+  let text = SAMPLES[0];
+  let result = compute(text, params);
+
+  const inputs = {
+    thought: $('thought'), gain: $('gain'), theta: $('theta'), focus: $('focus'),
+    noise: $('noise'), speed: $('speed'),
+  };
+
+  function readNumber(value, input, fallback) {
+    const n = value;
+    return typeof n === 'number' && Number.isFinite(n) ? clamp(n, Number(input.min), Number(input.max)) : fallback;
+  }
+
+  function restore() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(STORE)); } catch { /* storage unavailable */ }
+    if (!saved || typeof saved !== 'object') return;
+    if (typeof saved.text === 'string') text = saved.text.slice(0, 5000);
+    const p = saved.params || {};
+    if (OPS.includes(p.op)) params.op = p.op;
+    for (const k of PARAMS) params[k] = readNumber(p[k], inputs[k], PARAM_DEFAULTS[k]);
+    const v = saved.view || {};
+    for (const k of ['autoSpin', 'grid', 'particles', 'guides']) if (typeof v[k] === 'boolean') view[k] = v[k];
+    view.speed = readNumber(v.speed, inputs.speed, VIEW_DEFAULTS.speed);
+  }
+
+  let saveTimer = 0;
+  function flush() {
+    clearTimeout(saveTimer);
+    try { localStorage.setItem(STORE, JSON.stringify({ text, params, view })); } catch { /* storage unavailable */ }
+  }
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, 250);
+  }
+  addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+
+  /* =====================================================================
+     DOM rendering
+     ===================================================================== */
+  const fmt = (n, d = 2) => {
+    if (n === null || !Number.isFinite(n)) return '—';
+    const s = Math.abs(n).toFixed(d);
+    return (n < 0 && Number(s) !== 0 ? '−' : '') + s;
+  };
+
+  const AXES = [['x', 'X', 'Valence'], ['y', 'Y', 'Complexity'], ['z', 'Z', 'Entropy'], ['w', 'W', 'Density']];
+  const vecBody = $('vecBody');
+  const vecCells = {};
+  for (const [key, sym, name] of [...AXES, ['n', '‖V‖', 'Length']]) {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td class="axis"><span>${sym}</span>${name}</td><td class="num h"></td><td class="num a"></td>` +
+      '<td class="bar"><div class="bars"><i class="h"></i><i class="a"></i></div></td>';
+    const [, h, a, bar] = tr.children;
+    const [bh, ba] = bar.querySelectorAll('i');
+    vecCells[key] = { h, a, bh, ba };
+    vecBody.appendChild(tr);
+  }
+  function setBar(el, v, max) {
+    const f = Math.min(Math.abs(v) / max, 1) * 50;
+    el.style.width = f + '%';
+    el.style.left = (v < 0 ? 50 - f : 50) + '%';
+  }
+
+  const matrixEl = $('matrix');
+  const matrixCells = Array.from({ length: 9 }, () => matrixEl.appendChild(document.createElement('span')));
+
+  function matchPreset() {
+    return Object.keys(PRESETS).find((name) => {
+      const p = PRESETS[name];
+      const same = (k) => Math.abs(p[k] - params[k]) < 1e-6;
+      return p.op === params.op && same('gain') && same('noise') &&
+        (!USES_THETA.has(p.op) || same('theta')) && (p.op !== 'attention' || same('focus'));
+    }) || null;
+  }
+
+  function paintRange(input) {
+    const min = Number(input.min), max = Number(input.max);
+    input.style.setProperty('--p', ((Number(input.value) - min) / (max - min)) * 100 + '%');
+  }
+
+  function renderControls() {
+    if (inputs.thought.value !== text) inputs.thought.value = text;
+    for (const k of PARAMS) { inputs[k].value = params[k]; paintRange(inputs[k]); }
+    inputs.speed.value = view.speed; paintRange(inputs.speed);
+    $('gainOut').textContent = params.gain.toFixed(2) + '×';
+    $('thetaOut').textContent = Math.round(params.theta) + '°';
+    $('focusOut').textContent = params.focus.toFixed(1);
+    $('noiseOut').textContent = params.noise.toFixed(2);
+    $('speedOut').textContent = view.speed.toFixed(1) + '×';
+
+    document.querySelector(`input[name="op"][value="${params.op}"]`).checked = true;
+    const preset = matchPreset();
+    document.querySelectorAll('input[name="preset"]').forEach((r) => { r.checked = r.value === preset; });
+    $('presetFoot').textContent = preset ? PRESET_NOTES[preset] : 'Custom settings.';
+
+    const thetaOn = USES_THETA.has(params.op), focusOn = params.op === 'attention';
+    inputs.theta.disabled = !thetaOn; $('row-theta').classList.toggle('off', !thetaOn);
+    inputs.focus.disabled = !focusOn; $('row-focus').classList.toggle('off', !focusOn);
+    $('paramFoot').textContent = focusOn
+      ? 'θ does not apply to attention. Focus α sharpens the softmax.'
+      : thetaOn ? 'Focus α only applies to attention.' : 'Inversion ignores θ and α.';
+
+    for (const k of ['autoSpin', 'grid', 'particles', 'guides']) $(k).checked = view[k];
+    inputs.speed.disabled = !view.autoSpin; $('row-speed').classList.toggle('off', !view.autoSpin);
+  }
+
+  function renderOutputs() {
+    const r = result;
+    const n = Array.from(text.trim() ? text : '').length;
+    const wordCount = r.h.words;
+    $('count').textContent = `${wordCount} ${wordCount === 1 ? 'word' : 'words'} · ${n} ${n === 1 ? 'char' : 'chars'}`;
+
+    const rows = { x: [r.h.x, r.a.x], y: [r.h.y, r.a.y], z: [r.h.z, r.a.z], w: [r.h.w, r.a.w], n: [r.nh, r.na] };
+    const max = Math.max(1, ...Object.values(rows).flat().map(Math.abs));
+    for (const [k, [hv, av]] of Object.entries(rows)) {
+      const c = vecCells[k];
+      c.h.textContent = r.empty ? '—' : fmt(hv);
+      c.a.textContent = r.empty ? '—' : fmt(av);
+      setBar(c.bh, r.empty ? 0 : hv, max);
+      setBar(c.ba, r.empty ? 0 : av, max);
+    }
+
+    const refl = $('reflection');
+    refl.classList.toggle('empty', r.empty);
+    refl.textContent = r.empty ? 'Your reflection appears here.' : mirrorText(text);
+
+    $('sCos').textContent = fmt(r.cos, 3);
+    $('sAngle').textContent = r.angle === null ? '—' : r.angle.toFixed(1) + '°';
+    $('sDist').textContent = fmt(r.dist);
+    $('sDet').textContent = fmt(r.det);
+    $('tCos').textContent = fmt(r.cos, 3);
+    $('tDist').textContent = fmt(r.dist);
+    $('tBits').textContent = r.empty ? '—' : r.h.bits.toFixed(2) + ' bits';
+
+    r.M.flat().forEach((q, i) => { matrixCells[i].textContent = fmt(q); });
+    $('mKind').textContent = params.op === 'attention' ? 'Depends on input' : 'Linear';
+    $('mDet').textContent = fmt(r.det, 3);
+  }
+
+  function update({ controls = true } = {}) {
+    result = compute(text, params);
+    if (controls) renderControls();
+    renderOutputs();
+    save();
+  }
+
+  /* =====================================================================
+     Canvas renderer
+     ===================================================================== */
+  const canvas = $('stage');
+  const ctx = canvas.getContext('2d');
+  const CAM_HOME = { yaw: 0.7, pitch: 0.38, zoom: 1 };
+  const cam = { ...CAM_HOME, vYaw: 0, vPitch: 0, homing: false };
+  const CAM_DIST = 6;
+  let W = 0, H = 0, dpr = 1, stageVisible = true;
+  let palette = {};
+  let fontFamily = 'system-ui, sans-serif';
+  const shown = { h: { x: 0, y: 0, z: 0, w: 0 }, a: { x: 0, y: 0, z: 0, w: 0 } };
+
+  function readPalette() {
+    const cs = getComputedStyle(document.documentElement);
+    const t = (name) => cs.getPropertyValue(name).trim().replace(/\s+/g, ' ');
+    palette = { human: t('--c-human'), ai: t('--c-ai'), accent: t('--c-accent'), ink: t('--c-ink'), muted: t('--c-muted'), stage: t('--c-stage') };
+    fontFamily = getComputedStyle(document.body).fontFamily;
+  }
+  const rgba = (triplet, a) => `rgba(${triplet.split(' ').join(',')},${a})`;
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.max(1, rect.width); H = Math.max(1, rect.height);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (palette.ink) draw();
+  }
+  (function watchDpr() {
+    const mq = matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+    mq.addEventListener?.('change', () => { resize(); watchDpr(); }, { once: true });
+  })();
+
+  // Deterministic particle cloud inside a sphere of radius 1.6.
+  const particles = (() => {
+    const r = rng(7), list = [];
+    while (list.length < 180) {
+      const p = [r() * 2 - 1, r() * 2 - 1, r() * 2 - 1];
+      const d = Math.hypot(...p);
+      if (d > 1 || d < 0.08) continue;
+      list.push({ p: p.map((q) => q * 1.6), s: 0.6 + r() * 1.1, a: 0.18 + r() * 0.3 });
+    }
+    return list;
+  })();
+  let drift = 0;
+
+  let cy = 1, sy = 0, cp = 1, sp = 0, scale = 1, fit = 1;
+  function project(x, y, z) {
+    x *= fit; y *= fit; z *= fit;
+    const x1 = x * cy + z * sy;
+    const z1 = -x * sy + z * cy;
+    const y2 = y * cp - z1 * sp;
+    const z2 = y * sp + z1 * cp;
+    const k = CAM_DIST / Math.max(1.5, CAM_DIST - z2);
+    return { x: W / 2 + x1 * scale * k, y: H / 2 - y2 * scale * k, z: z2, k };
+  }
+  function line(a, b) { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+
+  function draw() {
+    cy = Math.cos(cam.yaw); sy = Math.sin(cam.yaw);
+    cp = Math.cos(cam.pitch); sp = Math.sin(cam.pitch);
+    const reach = Math.max(1.5, 1.1 * Math.hypot(shown.h.x, shown.h.y, shown.h.z), 1.1 * Math.hypot(shown.a.x, shown.a.y, shown.a.z));
+    fit = 1.5 / reach;
+    scale = Math.min(W, H) * 0.27 * cam.zoom;
+    ctx.clearRect(0, 0, W, H);
+    const { human, ai, accent, ink, muted, stage } = palette;
+    const label = (str, x, y, color) => {
+      ctx.lineWidth = 4; ctx.lineJoin = 'round';
+      ctx.strokeStyle = rgba(stage, 0.85);
+      ctx.strokeText(str, x, y);
+      ctx.fillStyle = color;
+      ctx.fillText(str, x, y);
+    };
+    const o = project(0, 0, 0);
+    const hasVec = !result.empty;
+
+    if (view.particles) {
+      const dc = Math.cos(drift), ds = Math.sin(drift);
+      for (const q of particles) {
+        const x = q.p[0] * dc + q.p[2] * ds, z = -q.p[0] * ds + q.p[2] * dc, y = q.p[1];
+        let color = accent, glow = 0;
+        if (hasVec) {
+          const dh = (x - shown.h.x) ** 2 + (y - shown.h.y) ** 2 + (z - shown.h.z) ** 2;
+          const da = (x - shown.a.x) ** 2 + (y - shown.a.y) ** 2 + (z - shown.a.z) ** 2;
+          const near = Math.min(dh, da);
+          glow = Math.exp(-near / 0.18);
+          if (glow > 0.05) color = dh < da ? human : ai;
+        }
+        const pt = project(x, y, z);
+        ctx.fillStyle = rgba(color, Math.min(1, q.a * (0.55 + 0.25 * pt.k) + glow * 0.6));
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, q.s * pt.k * (1 + glow * 0.8), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    if (view.grid) {
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = rgba(muted, 0.16);
+      for (let g = -1; g <= 1.0001; g += 0.5) {
+        line(project(g, -1, -1), project(g, -1, 1));
+        line(project(-1, -1, g), project(1, -1, g));
+      }
+      ctx.strokeStyle = rgba(muted, 0.1);
+      for (const [x, z] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) line(project(x, -1, z), project(x, 1, z));
+      for (const [a, b] of [[[-1, 1, -1], [1, 1, -1]], [[1, 1, -1], [1, 1, 1]], [[1, 1, 1], [-1, 1, 1]], [[-1, 1, 1], [-1, 1, -1]]]) {
+        line(project(...a), project(...b));
+      }
+    }
+
+    // Axes and their names.
+    ctx.lineWidth = 1.25;
+    ctx.font = `500 11px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const [v, name] of [[[1.3, 0, 0], 'Valence'], [[0, 1.3, 0], 'Complexity'], [[0, 0, 1.3], 'Entropy']]) {
+      ctx.strokeStyle = rgba(muted, 0.55);
+      const end = project(...v);
+      line(project(-v[0] * 0.25, -v[1] * 0.25, -v[2] * 0.25), end);
+      const tip = project(v[0] * 1.14, v[1] * 1.14, v[2] * 1.14);
+      label(name, tip.x, tip.y, rgba(muted, 0.95));
+    }
+
+    if (!hasVec) {
+      ctx.fillStyle = rgba(accent, 0.9);
+      ctx.beginPath(); ctx.arc(o.x, o.y, 3.5, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
+
+    const ph = project(shown.h.x, shown.h.y, shown.h.z);
+    const pa = project(shown.a.x, shown.a.y, shown.a.z);
+
+    if (view.guides) {
+      ctx.setLineDash([3, 4]);
+      ctx.lineWidth = 1;
+      for (const [v, color] of [[shown.h, human], [shown.a, ai]]) {
+        const floor = project(v.x, -1, v.z);
+        ctx.strokeStyle = rgba(color, 0.4);
+        line(project(v.x, v.y, v.z), floor);
+        ctx.fillStyle = rgba(color, 0.25);
+        ctx.beginPath(); ctx.ellipse(floor.x, floor.y, 5 * floor.k, 2.2 * floor.k, 0, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.strokeStyle = rgba(ink, 0.25);
+      line(ph, pa);
+      ctx.setLineDash([]);
+    }
+
+    const vectors = [
+      { p: ph, v: shown.h, color: human, name: 'Human' },
+      { p: pa, v: shown.a, color: ai, name: 'Mirror' },
+    ].sort((a, b) => a.p.z - b.p.z);
+
+    ctx.font = `600 12px ${fontFamily}`;
+    ctx.textAlign = 'left';
+    for (const { p, v, color, name } of vectors) {
+      const grad = ctx.createLinearGradient(o.x, o.y, p.x, p.y);
+      grad.addColorStop(0, rgba(color, 0.15));
+      grad.addColorStop(1, rgba(color, 1));
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      line(o, p);
+      const r = (4 + v.w * 5) * p.k;
+      ctx.save();
+      ctx.shadowColor = rgba(color, 0.7);
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = rgba(color, 1);
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      const tw = ctx.measureText(name).width;
+      const lx = p.x + r + 7 + tw > W - 10 ? p.x - r - 7 - tw : p.x + r + 7;
+      label(name, lx, Math.max(14, p.y - r - 2), rgba(color, 1));
+    }
+
+    ctx.fillStyle = rgba(accent, 0.9);
+    ctx.beginPath(); ctx.arc(o.x, o.y, 3, 0, Math.PI * 2); ctx.fill();
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    const k = reduceMotion ? 1 : 1 - Math.exp(-dt * 9);
+    for (const key of ['h', 'a']) {
+      const target = result[key];
+      for (const c of ['x', 'y', 'z', 'w']) shown[key][c] += (target[c] - shown[key][c]) * k;
+    }
+
+    if (cam.homing) {
+      const hk = 1 - Math.exp(-dt * 7);
+      let dy = ((CAM_HOME.yaw - cam.yaw) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+      cam.yaw += dy * hk;
+      cam.pitch += (CAM_HOME.pitch - cam.pitch) * hk;
+      cam.zoom += (CAM_HOME.zoom - cam.zoom) * hk;
+      if (Math.abs(dy) < 1e-3 && Math.abs(CAM_HOME.pitch - cam.pitch) < 1e-3 && Math.abs(CAM_HOME.zoom - cam.zoom) < 1e-3) { Object.assign(cam, CAM_HOME); cam.homing = false; }
+    } else if (!drag.active) {
+      cam.yaw += cam.vYaw * dt;
+      cam.pitch = clamp(cam.pitch + cam.vPitch * dt, -1.35, 1.35);
+      const decay = Math.exp(-dt * 4);
+      cam.vYaw *= decay; cam.vPitch *= decay;
+      if (view.autoSpin) cam.yaw += 0.35 * view.speed * dt;
+    }
+    if (view.particles && !reduceMotion) drift += dt * 0.04;
+
+    if (stageVisible && !document.hidden) draw();
+  }
+
+  /* ---- Pointer, wheel and keyboard camera control ---- */
+  const drag = { active: false, pointers: new Map(), pinch: 0, zoom: 1, lastT: 0, tapT: 0, tapX: 0, tapY: 0, moved: 0 };
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    canvas.setPointerCapture(e.pointerId);
+    drag.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    drag.active = true;
+    cam.homing = false;
+    cam.vYaw = cam.vPitch = 0;
+    drag.lastT = e.timeStamp;
+    if (drag.pointers.size === 1) drag.moved = 0;
+    if (drag.pointers.size === 2) {
+      const [a, b] = [...drag.pointers.values()];
+      drag.pinch = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      drag.zoom = cam.zoom;
+    }
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    const prev = drag.pointers.get(e.pointerId);
+    if (!prev) return;
+    const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+    drag.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (drag.pointers.size >= 2) {
+      const [a, b] = [...drag.pointers.values()];
+      cam.zoom = clamp(drag.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / drag.pinch), 0.45, 3);
+      drag.moved += 10;
+      return;
+    }
+    const dt = Math.max(1, e.timeStamp - drag.lastT) / 1000;
+    drag.lastT = e.timeStamp;
+    drag.moved += Math.abs(dx) + Math.abs(dy);
+    cam.yaw += dx * 0.008;
+    cam.pitch = clamp(cam.pitch + dy * 0.006, -1.35, 1.35);
+    cam.vYaw = (dx * 0.008) / dt;
+    cam.vPitch = (dy * 0.006) / dt;
+  });
+  function endPointer(e) {
+    if (!drag.pointers.delete(e.pointerId)) return;
+    if (drag.pointers.size === 1) {
+      drag.lastT = e.timeStamp;
+      cam.vYaw = cam.vPitch = 0;
+    }
+    if (drag.pointers.size > 0) return;
+    drag.active = false;
+    if (e.timeStamp - drag.lastT > 80) cam.vYaw = cam.vPitch = 0; // released after a pause: no fling
+    if (e.type === 'pointerup' && drag.moved < 6) {
+      const quick = e.timeStamp - drag.tapT < 320 && Math.hypot(e.clientX - drag.tapX, e.clientY - drag.tapY) < 30;
+      if (quick) { resetCamera(); drag.tapT = 0; return; }
+      drag.tapT = e.timeStamp; drag.tapX = e.clientX; drag.tapY = e.clientY;
+    }
+  }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('lostpointercapture', endPointer);
+  canvas.addEventListener('wheel', (e) => {
+    const pageScrolls = document.documentElement.scrollHeight > innerHeight + 1;
+    if (pageScrolls && !e.ctrlKey && !e.metaKey && document.activeElement !== canvas) return; // let the page scroll
+    e.preventDefault();
+    cam.homing = false;
+    const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    cam.zoom = clamp(cam.zoom * Math.exp(-delta * 0.0015), 0.45, 3);
+  }, { passive: false });
+  canvas.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const step = { ArrowLeft: [-0.12, 0], ArrowRight: [0.12, 0], ArrowUp: [0, -0.1], ArrowDown: [0, 0.1] }[e.key];
+    if (step) {
+      cam.homing = false;
+      cam.yaw += step[0];
+      cam.pitch = clamp(cam.pitch + step[1], -1.35, 1.35);
+    } else if (e.key === '+' || e.key === '=') cam.zoom = clamp(cam.zoom * 1.12, 0.45, 3);
+    else if (e.key === '-' || e.key === '_') cam.zoom = clamp(cam.zoom / 1.12, 0.45, 3);
+    else if (e.key === '0') resetCamera();
+    else return;
+    e.preventDefault();
+  });
+  function resetCamera() { cam.vYaw = cam.vPitch = 0; cam.homing = true; }
+
+  /* =====================================================================
+     Wiring
+     ===================================================================== */
+  inputs.thought.addEventListener('input', () => { text = inputs.thought.value; update({ controls: false }); });
+  for (const k of PARAMS) {
+    inputs[k].addEventListener('input', () => { params[k] = Number(inputs[k].value); update(); });
+  }
+  document.querySelectorAll('input[name="op"]').forEach((r) =>
+    r.addEventListener('change', () => { params.op = r.value; update(); }));
+  document.querySelectorAll('input[name="preset"]').forEach((r) =>
+    r.addEventListener('change', () => { Object.assign(params, PRESETS[r.value]); update(); }));
+  for (const k of ['autoSpin', 'grid', 'particles', 'guides']) {
+    $(k).addEventListener('change', () => { view[k] = $(k).checked; renderControls(); save(); });
+  }
+  inputs.speed.addEventListener('input', () => { view.speed = Number(inputs.speed.value); renderControls(); save(); });
+  document.querySelectorAll('[data-sample]').forEach((b) =>
+    b.addEventListener('click', () => { text = SAMPLES[Number(b.dataset.sample)]; update(); }));
+  $('clear').addEventListener('click', () => { text = ''; update(); inputs.thought.focus(); });
+  $('resetCam').addEventListener('click', resetCamera);
+  $('resetAll').addEventListener('click', () => {
+    Object.assign(params, PARAM_DEFAULTS);
+    Object.assign(view, VIEW_DEFAULTS);
+    text = SAMPLES[0];
+    resetCamera();
+    update();
+  });
+
+  new ResizeObserver(resize).observe(canvas);
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(([entry]) => { stageVisible = entry.isIntersecting; }).observe(canvas);
+  }
+  const scheme = matchMedia('(prefers-color-scheme: dark)');
+  scheme.addEventListener?.('change', readPalette);
+  new MutationObserver(readPalette).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+
+  restore();
+  readPalette();
+  resize();
+  update();
+  requestAnimationFrame((t) => { last = t; frame(t); });
+
+  // Offline support when served as a standalone app (skipped inside embeds and file://).
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.top === window.self) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  }
+})();
+</script>
+</body><!--shell-->
+</html><!--shell-->
