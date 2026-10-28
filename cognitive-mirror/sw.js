@@ -1,5 +1,8 @@
 // Offline cache for Cognitive Mirror. Bump VERSION when shipping changes.
-const VERSION = 'mirror-v2';
+// Caches are origin-wide, so only ever touch our own (prefixed) ones.
+const PREFIX = 'cognitive-mirror-';
+const VERSION = `${PREFIX}v3`;
+const ours = (key) => key.startsWith(PREFIX) || /^mirror-v\d+$/.test(key); // includes pre-prefix names
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -13,7 +16,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => ours(k) && k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
