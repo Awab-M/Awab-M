@@ -401,7 +401,7 @@
         <h2><label for="thought">Your thought</label></h2>
         <span class="meta num" id="count">0 words · 0 chars</span>
       </div>
-      <textarea id="thought" spellcheck="true" autocomplete="off" placeholder="Write a sentence and watch where it lands."></textarea>
+      <textarea id="thought" maxlength="5000" spellcheck="true" autocomplete="off" placeholder="Write a sentence and watch where it lands."></textarea>
       <div class="chips" role="group" aria-label="Examples">
         <button class="chip" type="button" data-sample="0">Warm</button>
         <button class="chip" type="button" data-sample="1">Tense</button>
@@ -681,7 +681,7 @@
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(STORE)); } catch { /* storage unavailable */ }
     if (!saved || typeof saved !== 'object') return;
-    if (typeof saved.text === 'string') text = saved.text.slice(0, 5000);
+    if (typeof saved.text === 'string') text = saved.text.slice(0, inputs.thought.maxLength);
     const p = saved.params || {};
     if (OPS.includes(p.op)) params.op = p.op;
     for (const k of PARAMS) params[k] = readNumber(p[k], inputs[k], PARAM_DEFAULTS[k]);
